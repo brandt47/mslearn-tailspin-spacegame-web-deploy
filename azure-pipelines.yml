@@ -11,13 +11,13 @@ stages:
   - job: 'Build'
     displayName: 'Build job'
     pool:
-      vmImage: 'ubuntu-20.04'
+      vmImage: 'ubuntu-22.04'
       demands:
       - npm
 
     variables:
       wwwrootDir: 'Tailspin.SpaceGame.Web/wwwroot'
-      dotnetSdkVersion: '5.x'
+      dotnetSdkVersion: '8.x'
 
     steps:
     - task: UseDotNet@2
@@ -30,7 +30,7 @@ stages:
       inputs:
         verbose: false
 
-    - script: './node_modules/.bin/node-sass $(wwwrootDir) --output $(wwwrootDir)'
+    - script: './node_modules/.bin/sass Tailspin.SpaceGame.Web/wwwroot:Tailspin.SpaceGame.Web/wwwroot'
       displayName: 'Compile Sass assets'
 
     - task: gulp@1
@@ -57,7 +57,7 @@ stages:
       displayName: 'Publish the project - $(buildConfiguration)'
       inputs:
         command: 'publish'
-        projects: '**/*.csproj'
+        projects: '$(System.DefaultWorkingDirectory)/**/Tailspin.SpaceGame.Web.csproj' 
         publishWebProjects: false
         arguments: '--no-build --configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/$(buildConfiguration)'
         zipAfterPublish: true
@@ -71,7 +71,7 @@ stages:
   jobs:
   - deployment: Deploy
     pool:
-      vmImage: 'ubuntu-20.04'
+      vmImage: 'ubuntu-22.04'
     environment: dev
     variables:
     - group: Release
@@ -81,12 +81,13 @@ stages:
           steps:
           - download: current
             artifact: drop
-          - task: AzureWebApp@1
-            displayName: 'Azure App Service Deploy: website'
+          - task: PowerShell@2
+            displayName: 'Deploy to Azure App Service (Dev)'
             inputs:
-              azureSubscription: 'Resource Manager - Tailspin - Space Game'
-              appName: '$(WebAppNameDev)'
-              package: '$(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip'
+              targetType: 'inline'
+              script: |
+                # Replace with your deployment script or Azure CLI commands
+                Write-Host "Deploying $(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip to $(WebAppNameDev) in Azure"
 
 - stage: 'Test'
   displayName: 'Deploy to the test environment'
@@ -94,7 +95,7 @@ stages:
   jobs:
   - deployment: Deploy
     pool:
-      vmImage: 'ubuntu-20.04'
+      vmImage: 'ubuntu-22.04'
     environment: test
     variables:
     - group: 'Release'
@@ -104,12 +105,39 @@ stages:
           steps:
           - download: current
             artifact: drop
-          - task: AzureWebApp@1
-            displayName: 'Azure App Service Deploy: website'
+          - task: PowerShell@2
+            displayName: 'Deploy to Azure App Service (Test)'
             inputs:
-              azureSubscription: 'Resource Manager - Tailspin - Space Game'
-              appName: '$(WebAppNameTest)'
-              package: '$(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip'
+              targetType: 'inline'
+              script: |
+                # Replace with your deployment script or Azure CLI commands
+                Write-Host "Deploying $(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip to $(WebAppNameTest) in Azure"
+
+  - job: RunUITests
+    dependsOn: Deploy
+    displayName: 'Run UI tests'
+    pool:
+      vmImage: 'windows-2019'
+    variables:
+    - group: 'Release'
+    steps: 
+    - task: UseDotNet@2
+      displayName: 'Use .NET SDK $(dotnetSdkVersion)'
+      inputs:
+        version: '$(dotnetSdkVersion)'
+    - task: DotNetCoreCLI@2
+      displayName: 'Build the project - $(buildConfiguration)'
+      inputs:
+        command: 'build'
+        arguments: '--configuration $(buildConfiguration)'
+        projects: '$(System.DefaultWorkingDirectory)/**/*UITests.csproj'
+    - task: DotNetCoreCLI@2
+      displayName: 'Run unit tests - $(buildConfiguration)'
+      inputs:
+        command: 'test'
+        arguments: '--no-build --configuration $(buildConfiguration)'
+        publishTestResults: true
+        projects: '$(System.DefaultWorkingDirectory)/**/*UITests.csproj'
 
 - stage: 'Staging'
   displayName: 'Deploy to the staging environment'
@@ -117,7 +145,7 @@ stages:
   jobs:
   - deployment: Deploy
     pool:
-      vmImage: 'ubuntu-20.04'
+      vmImage: 'ubuntu-22.04'
     environment: staging
     variables:
     - group: 'Release'
@@ -127,9 +155,10 @@ stages:
           steps:
           - download: current
             artifact: drop
-          - task: AzureWebApp@1
-            displayName: 'Azure App Service Deploy: website'
+          - task: PowerShell@2
+            displayName: 'Deploy to Azure App Service (Staging)'
             inputs:
-              azureSubscription: 'Resource Manager - Tailspin - Space Game'
-              appName: '$(WebAppNameStaging)'
-              package: '$(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip'
+              targetType: 'inline'
+              script: |
+                # Replace with your deployment script or Azure CLI commands
+                Write-Host "Deploying $(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip to $(WebAppNameStaging) in Azure"
