@@ -8,18 +8,16 @@ variables:
 stages:
 - stage: 'Build'
   displayName: 'Build the web application'
-  jobs: 
+  jobs:
   - job: 'Build'
     displayName: 'Build job'
     pool:
       vmImage: 'ubuntu-22.04'
       demands:
       - npm
-
     variables:
       wwwrootDir: 'Tailspin.SpaceGame.Web/wwwroot'
       dotnetSdkVersion: '8.x'
-
     steps:
     - task: UseDotNet@2
       displayName: 'Use .NET SDK $(dotnetSdkVersion)'
@@ -58,7 +56,7 @@ stages:
       displayName: 'Publish the project - $(buildConfiguration)'
       inputs:
         command: 'publish'
-        projects: '$(System.DefaultWorkingDirectory)/**/Tailspin.SpaceGame.Web.csproj' 
+        projects: '$(System.DefaultWorkingDirectory)/**/Tailspin.SpaceGame.Web.csproj'
         publishWebProjects: false
         arguments: '--no-build --configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/$(buildConfiguration)'
         zipAfterPublish: true
@@ -90,7 +88,7 @@ stages:
               package: '$(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip'
 
 - stage: 'Test'
-  displayName: 'Deploy to the test environment'
+  displayName: 'Deploy to the test environment & run UI tests'
   dependsOn: Dev
   jobs:
   - deployment: Deploy
@@ -119,12 +117,13 @@ stages:
       vmImage: 'windows-2019'
     variables:
     - group: 'Release'
-    steps: 
+    steps:
     - task: UseDotNet@2
       displayName: 'Use .NET SDK $(dotnetSdkVersion)'
       inputs:
         version: '$(dotnetSdkVersion)'
 
+    # Export the TEST_BASE_URL so your tests can pick it up
     - script: |
         echo "##vso[task.setvariable variable=TEST_BASE_URL]https://tailspin-space-game-tstgb-a4edaufyhgc3dbdg.canadacentral-01.azurewebsites.net"
       displayName: 'Set TEST_BASE_URL'
@@ -138,9 +137,11 @@ stages:
 
     - task: DotNetCoreCLI@2
       displayName: 'Run UI tests - $(buildConfiguration)'
+      env:
+        TEST_BASE_URL: $(TEST_BASE_URL)
       inputs:
         command: 'test'
-        arguments: '--no-build --configuration $(buildConfiguration) -- TestRunParameters.Parameter(name=\"BaseUrl\",value=\"$(TEST_BASE_URL)\")'
+        arguments: '--no-build --configuration $(buildConfiguration)'
         publishTestResults: true
         projects: '$(System.DefaultWorkingDirectory)/**/*UITests.csproj'
 
