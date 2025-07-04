@@ -111,6 +111,7 @@ stages:
               azureSubscription: 'Resource Manager - Tailspin - Space Game'
               appName: '$(WebAppNameTest)'
               package: '$(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip'
+
   - job: RunUITests
     dependsOn: Deploy
     displayName: 'Run UI tests'
@@ -123,17 +124,23 @@ stages:
       displayName: 'Use .NET SDK $(dotnetSdkVersion)'
       inputs:
         version: '$(dotnetSdkVersion)'
+
+    - script: |
+        echo "##vso[task.setvariable variable=TEST_BASE_URL]https://tailspin-space-game-tstgb-a4edaufyhgc3dbdg.canadacentral-01.azurewebsites.net"
+      displayName: 'Set TEST_BASE_URL'
+
     - task: DotNetCoreCLI@2
-      displayName: 'Build the project - $(buildConfiguration)'
+      displayName: 'Build the UI test project'
       inputs:
         command: 'build'
         arguments: '--configuration $(buildConfiguration)'
         projects: '$(System.DefaultWorkingDirectory)/**/*UITests.csproj'
+
     - task: DotNetCoreCLI@2
-      displayName: 'Run unit tests - $(buildConfiguration)'
+      displayName: 'Run UI tests - $(buildConfiguration)'
       inputs:
         command: 'test'
-        arguments: '--no-build --configuration $(buildConfiguration)'
+        arguments: '--no-build --configuration $(buildConfiguration) -- TestRunParameters.Parameter(name=\"BaseUrl\",value=\"$(TEST_BASE_URL)\")'
         publishTestResults: true
         projects: '$(System.DefaultWorkingDirectory)/**/*UITests.csproj'
 
