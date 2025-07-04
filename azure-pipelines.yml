@@ -111,46 +111,39 @@ stages:
               package: '$(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip'
 
   - job: RunUITests
-  dependsOn: Deploy
-  displayName: 'Run UI tests'
-  pool:
-    vmImage: 'windows-2019'
-  variables:
-  - group: 'Release'
-  steps:
-  # 1) Install a matching ChromeDriver so Selenium can launch it
-  - script: choco install selenium-chromedriver -y
-    displayName: 'Install ChromeDriver'
+    dependsOn: Deploy
+    displayName: 'Run UI tests'
+    pool:
+      vmImage: 'windows-2019'
+    variables:
+    - group: 'Release'
+    steps:
+    - task: UseDotNet@2
+      displayName: 'Use .NET SDK $(dotnetSdkVersion)'
+      inputs:
+        version: '$(dotnetSdkVersion)'
 
-  # 2) Export the TEST_BASE_URL so your tests can pick it up
-  - script: |
-      echo "##vso[task.setvariable variable=TEST_BASE_URL]https://tailspin-space-game-tstgb-a4edaufyhgc3dbdg.canadacentral-01.azurewebsites.net"
-    displayName: 'Set TEST_BASE_URL'
+    # Export the TEST_BASE_URL so your tests can pick it up
+    - script: |
+        echo "##vso[task.setvariable variable=TEST_BASE_URL]https://tailspin-space-game-tstgb-a4edaufyhgc3dbdg.canadacentral-01.azurewebsites.net"
+      displayName: 'Set TEST_BASE_URL'
 
-  # 3) Use the .NET SDK
-  - task: UseDotNet@2
-    displayName: 'Use .NET SDK $(dotnetSdkVersion)'
-    inputs:
-      version: '$(dotnetSdkVersion)'
+    - task: DotNetCoreCLI@2
+      displayName: 'Build the UI test project'
+      inputs:
+        command: 'build'
+        arguments: '--configuration $(buildConfiguration)'
+        projects: '$(System.DefaultWorkingDirectory)/**/*UITests.csproj'
 
-  # 4) Build the UI test project
-  - task: DotNetCoreCLI@2
-    displayName: 'Build the UI test project'
-    inputs:
-      command: 'build'
-      arguments: '--configuration $(buildConfiguration)'
-      projects: '$(System.DefaultWorkingDirectory)/**/*UITests.csproj'
-
-  # 5) Run the UI tests (with TEST_BASE_URL on the environment)
-  - task: DotNetCoreCLI@2
-    displayName: 'Run UI tests - $(buildConfiguration)'
-    env:
-      TEST_BASE_URL: $(TEST_BASE_URL)
-    inputs:
-      command: 'test'
-      arguments: '--no-build --configuration $(buildConfiguration)'
-      publishTestResults: true
-      projects: '$(System.DefaultWorkingDirectory)/**/*UITests.csproj'
+    - task: DotNetCoreCLI@2
+      displayName: 'Run UI tests - $(buildConfiguration)'
+      env:
+        TEST_BASE_URL: $(TEST_BASE_URL)
+      inputs:
+        command: 'test'
+        arguments: '--no-build --configuration $(buildConfiguration)'
+        publishTestResults: true
+        projects: '$(System.DefaultWorkingDirectory)/**/*UITests.csproj'
 
 - stage: 'Staging'
   displayName: 'Deploy to the staging environment'
