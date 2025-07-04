@@ -83,18 +83,12 @@ stages:
           steps:
           - download: current
             artifact: drop
-          - task: PowerShell@2
-            displayName: 'Deploy to Azure App Service (Dev)'
+          - task: AzureWebApp@1
+            displayName: 'Azure App Service Deploy: website'
             inputs:
-              targetType: 'inline'
-              script: |
-                # Install Azure CLI if not present
-                if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
-                  Invoke-WebRequest -Uri https://aka.ms/installazurecliwindows -OutFile .\AzureCLI.msi
-                  Start-Process msiexec.exe -Wait -ArgumentList '/I AzureCLI.msi /quiet'
-                }
-                az login --service-principal -u $(azureServicePrincipalUsername) -p $(azureServicePrincipalPassword) --tenant $(azureTenantId)
-                az webapp deployment source config-zip --resource-group $(ResourceGroupNameDev) --name $(WebAppNameDev) --src "$(Pipeline.Workspace)/drop/$(buildConfiguration)/Tailspin.SpaceGame.Web.zip"
+              azureSubscription: 'Resource Manager - Tailspin - Space Game'
+              appName: '$(WebAppNameDev)'
+              package: '$(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip'
 
 - stage: 'Test'
   displayName: 'Deploy to test & run UI tests'
@@ -112,18 +106,12 @@ stages:
             steps:
             - download: current
               artifact: drop
-            - task: PowerShell@2
-              displayName: 'Deploy to Azure App Service (Test)'
+            - task: AzureWebApp@1
+              displayName: 'Azure App Service Deploy'
               inputs:
-                targetType: 'inline'
-                script: |
-                  # Install Azure CLI if not present
-                  if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
-                    Invoke-WebRequest -Uri https://aka.ms/installazurecliwindows -OutFile .\AzureCLI.msi
-                    Start-Process msiexec.exe -Wait -ArgumentList '/I AzureCLI.msi /quiet'
-                  }
-                  az login --service-principal -u $(azureServicePrincipalUsername) -p $(azureServicePrincipalPassword) --tenant $(azureTenantId)
-                  az webapp deployment source config-zip --resource-group $(ResourceGroupNameTest) --name $(WebAppNameTest) --src "$(Pipeline.Workspace)/drop/$(buildConfiguration)/Tailspin.SpaceGame.Web.zip"
+                azureSubscription: 'Resource Manager - Tailspin - Space Game'
+                appName: '$(WebAppNameTest)'
+                package: '$(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip'
 
     - job: RunUITests
       displayName: 'Run UI tests'
@@ -178,15 +166,9 @@ stages:
           steps:
           - download: current
             artifact: drop
-          - task: PowerShell@2
-            displayName: 'Deploy to Azure App Service (Staging)'
+          - task: AzureWebApp@1
+            displayName: 'Azure App Service Deploy: website'
             inputs:
-              targetType: 'inline'
-              script: |
-                # Install Azure CLI if not present
-                if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
-                  Invoke-WebRequest -Uri https://aka.ms/installazurecliwindows -OutFile .\AzureCLI.msi
-                  Start-Process msiexec.exe -Wait -ArgumentList '/I AzureCLI.msi /quiet'
-                }
-                az login --service-principal -u $(azureServicePrincipalUsername) -p $(azureServicePrincipalPassword) --tenant $(azureTenantId)
-                az webapp deployment source config-zip --resource-group $(ResourceGroupNameStaging) --name $(WebAppNameStaging) --src "$(Pipeline.Workspace)/drop/$(buildConfiguration)/Tailspin.SpaceGame.Web.zip"
+              azureSubscription: 'Resource Manager - Tailspin - Space Game'
+              appName: '$(WebAppNameStaging)'
+              package: '$(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip'
