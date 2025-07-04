@@ -91,52 +91,64 @@ stages:
               package: '$(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip'
 
 - stage: 'Test'
-  displayName: 'Deploy to the test environment'
+  displayName: 'Deploy to test & run UI tests'
   dependsOn: Dev
+  variables:
+    SITE_URL: 'tailspin-space-game-tstgb-a4edaufyhgc3dbdg.canadacentral-01.azurewebsites.net'
   jobs:
-  - deployment: Deploy
-    pool:
-      vmImage: 'ubuntu-22.04'
-    environment: test
-    variables:
-    - group: 'Release'
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - download: current
-            artifact: drop
-          - task: AzureWebApp@1
-            displayName: 'Azure App Service Deploy: website'
-            inputs:
-              azureSubscription: 'Resource Manager - Tailspin - Space Game'
-              appName: '$(WebAppNameTest)'
-              package: '$(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip'
-  - job: RunUITests
-    dependsOn: Deploy
-    displayName: 'Run UI tests'
-    pool:
-      vmImage: 'windows-2019'
-    variables:
-    - group: 'Release'
-    steps: 
-    - task: UseDotNet@2
-      displayName: 'Use .NET SDK $(dotnetSdkVersion)'
-      inputs:
-        version: '$(dotnetSdkVersion)'
-    - task: DotNetCoreCLI@2
-      displayName: 'Build the project - $(buildConfiguration)'
-      inputs:
-        command: 'build'
-        arguments: '--configuration $(buildConfiguration)'
-        projects: '$(System.DefaultWorkingDirectory)/**/*UITests.csproj'
-    - task: DotNetCoreCLI@2
-      displayName: 'Run unit tests - $(buildConfiguration)'
-      inputs:
-        command: 'test'
-        arguments: '--no-build --configuration $(buildConfiguration)'
-        publishTestResults: true
-        projects: '$(System.DefaultWorkingDirectory)/**/*UITests.csproj'
+    - deployment: Deploy
+      pool:
+        vmImage: 'ubuntu-22.04'
+      environment: test
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+            - download: current
+              artifact: drop
+            - task: AzureWebApp@1
+              displayName: 'Azure App Service Deploy'
+              inputs:
+                azureSubscription: 'Resource Manager - Tailspin - Space Game'
+                appName: '$(WebAppNameTest)'
+                package: '$(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip'
+
+    - job: RunUITests
+      displayName: 'Run UI tests'
+      pool:
+        vmImage: 'windows-latest'            # or windows-2019 with choco install
+      variables:
+        TEST_BASE_URL: 'https://$(SITE_URL)'  # pass the site URL into your tests
+      steps:
+        - task: PowerShell@2
+          displayName: 'Install Chrome & ChromeDriver'
+          inputs:
+            targetType: inline
+            script: |
+              choco install googlechrome -y
+              choco install chromedriver -y
+              $env:PATH += ";${env:ProgramData}\chocolatey\bin"
+        - script: |
+            Write-Host "TEST_BASE_URL = $(TEST_BASE_URL)"
+          displayName: 'Echo TEST_BASE_URL'
+        - task: UseDotNet@2
+          displayName: 'Use .NET SDK $(dotnetSdkVersion)'
+          inputs:
+            version: '$(dotnetSdkVersion)'
+        - task: DotNetCoreCLI@2
+          displayName: 'Build UI test project'
+          inputs:
+            command: build
+            arguments: '--configuration $(buildConfiguration)'
+            projects: '$(System.DefaultWorkingDirectory)/**/*UITests.csproj'
+        - task: DotNetCoreCLI@2
+          displayName: 'Run UI tests'
+          inputs:
+            command: test
+            arguments: '--no-build --configuration $(buildConfiguration)'
+            publishTestResults: true
+            projects: '$(System.DefaultWorkingDirectory)/**/*UITests.csproj'
+
 
 - stage: 'Staging'
   displayName: 'Deploy to the staging environment'
